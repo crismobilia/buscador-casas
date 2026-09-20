@@ -118,8 +118,8 @@ def extraer_links_de_lista(url):
         )
         
         resultado = json.loads(interaction.output_text)
-        return resultado.get("links", [])
+        return {"status": "ok", "links": resultado.get("links", [])}
         
     except Exception as e:
         print("Error en extraer_links_de_lista:", e)
-        return []
+        return {"status": "error", "message": str(e), "links": []}

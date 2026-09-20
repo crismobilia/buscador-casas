@@ -41,13 +41,21 @@ def mostrar_pantalla_agregar():
             if url_lista:
                 with st.spinner("🕵️ Buscando propiedades en la página..."):
                     from src.gemini import extraer_links_de_lista
-                    links_encontrados = extraer_links_de_lista(url_lista)
+                    resultado = extraer_links_de_lista(url_lista)
                     
-                if links_encontrados:
-                    st.success(f"¡Se encontraron {len(links_encontrados)} casas! Procesando...")
-                    procesar_lista_links(links_encontrados)
+                if isinstance(resultado, dict) and resultado.get("status") == "error":
+                    st.error(f"Hubo un error al leer la página: {resultado.get('message')}")
+                    st.info("💡 Consejo: A veces los sitios bloquean el acceso automático de los robots. Intentá usar la pestaña 'Varios Links' copiándolos a mano.")
                 else:
-                    st.error("No se encontraron links de propiedades o el sitio bloqueó al robot.")
+                    # Compatibility if it returns dict or list directly
+                    links_encontrados = resultado.get("links", []) if isinstance(resultado, dict) else resultado
+                    
+                    if links_encontrados:
+                        st.success(f"¡Se encontraron {len(links_encontrados)} casas! Procesando...")
+                        procesar_lista_links(links_encontrados)
+                    else:
+                        st.warning("El robot logró leer la página, pero no encontró ningún link hacia las propiedades.")
+                        st.info("🤔 ¿Por qué pasa esto? Muchas inmobiliarias (como Feray) programan mal sus páginas web usando botones invisibles en lugar de links reales (etiquetas <a>). Esto hace que el robot no pueda ver a dónde lleva el clic. En estos casos, te conviene entrar a la web y copiar los links de las casas a mano en la pestaña 'Varios Links'.")
             else:
                 st.error("Por favor ingresá una URL.")
 
