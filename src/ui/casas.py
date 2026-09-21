@@ -245,10 +245,49 @@ def mostrar_pantalla_casas():
             casa_dict["voto_actual"] = voto_actual
             casas_a_mostrar.append(casa_dict)
             
-        # --- BOTÓN DE BORRAR ---
+        # --- BOTONES DE ACCIÓN ---
         st.write("---")
         cantidad = len(casas_a_mostrar)
-        if st.button(f"🗑️ Borrar las {cantidad} casas mostradas", type="secondary", use_container_width=True):
+        pendientes = [c for c in casas_a_mostrar if "Error" in str(c.get("mejor_rasgo", ""))]
+        
+        c_acc1, c_acc2 = st.columns(2)
+        
+        if c_acc1.button(f"🔄 Recalcular {len(pendientes)} zonas pendientes", disabled=(len(pendientes)==0), use_container_width=True):
+            from src.osm import calcular_puntaje_zona
+            from src.gsheets import get_sheet
+            import time
+            import src.gsheets
+            
+            sheet = get_sheet("Casas")
+            cols_headers = sheet.row_values(1)
+            
+            progreso = st.progress(0)
+            texto_prog = st.empty()
+            
+            for idx, c in enumerate(pendientes):
+                texto_prog.write(f"Recalculando {idx+1} de {len(pendientes)}... (Esperando 6s para no saturar el servidor de mapas)")
+                
+                # Respetar rate limits de OSM API (esperar 6 segundos)
+                if idx > 0:
+                    time.sleep(6)
+                    
+                lat, lon = c.get("lat"), c.get("lon")
+                if lat and lon:
+                    nuevos = calcular_puntaje_zona(lat, lon)
+                    cell = sheet.find(c["id"])
+                    if cell:
+                        sheet.update_cell(cell.row, cols_headers.index("puntaje_zona")+1, nuevos["puntaje_zona"])
+                        sheet.update_cell(cell.row, cols_headers.index("mejor_rasgo")+1, nuevos["mejor_rasgo"])
+                        sheet.update_cell(cell.row, cols_headers.index("peor_rasgo")+1, nuevos["peor_rasgo"])
+                        sheet.update_cell(cell.row, cols_headers.index("subpuntajes")+1, nuevos["subpuntajes"])
+                
+                progreso.progress((idx + 1) / len(pendientes))
+                
+            texto_prog.write("¡Recálculo completado!")
+            src.gsheets.get_todas_las_casas.clear()
+            st.rerun()
+            
+        if c_acc2.button(f"🗑️ Borrar las {cantidad} casas mostradas", type="secondary", use_container_width=True):
             if cantidad > 0:
                 ids_a_borrar = [str(c["id"]) for c in casas_a_mostrar]
                 # Quedarnos solo con las casas que NO queremos borrar
@@ -315,11 +354,17 @@ def mostrar_pantalla_casas():
                         moneda = casa.get('moneda', 'USD')
                         precio = casa.get('precio', 'Consulte')
                         
+                        direccion = str(casa.get('dirección', '')).strip()
+                        barrio = str(casa.get('barrio', '')).strip()
+                        ubicacion_texto = f"{direccion}, {barrio}".strip(", ")
+                        if str(casa.get('ubicacion_exacta', '')).lower() == 'no':
+                            ubicacion_texto = f"Aprox: {ubicacion_texto}"
+                            
                         st.markdown(f"""
                         <div style='line-height:1.2; margin-bottom: 10px'>
                             <h4 style='margin-bottom:2px'>{moneda} {precio}</h4>
-                            <span style='font-size:0.85em; color:gray'>{casa.get('barrio', '')}</span><br>
-                            <span style='font-size:0.85em'>📏 {casa.get('ambientes', '?')} amb | {casa.get('m2_cubiertos', '?')} m² | 🛏️ {casa.get('dormitorios', '?')} dorm</span><br>
+                            <span style='font-size:0.85em; color:gray'>{ubicacion_texto}</span><br>
+                            <span style='font-size:0.85em'>📐 {casa.get('ambientes', '?')} amb | {casa.get('m2_cubiertos', '?')} m² | 🛏️ {casa.get('dormitorios', '?')} dorm</span><br>
                             <span style='font-size:0.85em'>💡 {casa.get('resumen_corto', '')}</span>
                         </div>
                         """, unsafe_allow_html=True)
