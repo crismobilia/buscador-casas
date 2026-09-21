@@ -257,9 +257,11 @@ def mostrar_pantalla_casas():
             from src.gsheets import get_sheet
             import time
             import src.gsheets
+            import gspread
             
             sheet = get_sheet("Casas")
             cols_headers = sheet.row_values(1)
+            all_ids = sheet.col_values(1)
             
             progreso = st.progress(0)
             texto_prog = st.empty()
@@ -274,13 +276,17 @@ def mostrar_pantalla_casas():
                 lat, lon = c.get("lat"), c.get("lon")
                 if lat and lon:
                     nuevos = calcular_puntaje_zona(lat, lon)
-                    # Convertimos el ID explícitamente a string porque gspread.find tira error si no lo es
-                    cell = sheet.find(str(c["id"]))
-                    if cell:
-                        sheet.update_cell(cell.row, cols_headers.index("puntaje_zona")+1, nuevos["puntaje_zona"])
-                        sheet.update_cell(cell.row, cols_headers.index("mejor_rasgo")+1, nuevos["mejor_rasgo"])
-                        sheet.update_cell(cell.row, cols_headers.index("peor_rasgo")+1, nuevos["peor_rasgo"])
-                        sheet.update_cell(cell.row, cols_headers.index("subpuntajes")+1, nuevos["subpuntajes"])
+                    try:
+                        row_idx = all_ids.index(str(c["id"])) + 1
+                        cells = [
+                            gspread.Cell(row=row_idx, col=cols_headers.index("puntaje_zona")+1, value=nuevos["puntaje_zona"]),
+                            gspread.Cell(row=row_idx, col=cols_headers.index("mejor_rasgo")+1, value=nuevos["mejor_rasgo"]),
+                            gspread.Cell(row=row_idx, col=cols_headers.index("peor_rasgo")+1, value=nuevos["peor_rasgo"]),
+                            gspread.Cell(row=row_idx, col=cols_headers.index("subpuntajes")+1, value=nuevos["subpuntajes"])
+                        ]
+                        sheet.update_cells(cells)
+                    except ValueError:
+                        pass # Si no encuentra el ID, salteamos
                 
                 progreso.progress((idx + 1) / len(pendientes))
                 
@@ -383,20 +389,25 @@ def mostrar_pantalla_casas():
                                     lat, lon = casa.get("lat"), casa.get("lon")
                                     if lat and lon:
                                         nuevos = calcular_puntaje_zona(lat, lon)
+                                        import gspread
                                         # Update the specific row
                                         sheet = get_sheet("Casas")
-                                        # Encontrar la fila (siempre con str)
-                                        cell = sheet.find(str(casa["id"]))
-                                        if cell:
-                                            # Columnas de zona: puntaje(24), mejor(25), peor(26), sub(27)
-                                            cols_headers = sheet.row_values(1)
-                                            sheet.update_cell(cell.row, cols_headers.index("puntaje_zona")+1, nuevos["puntaje_zona"])
-                                            sheet.update_cell(cell.row, cols_headers.index("mejor_rasgo")+1, nuevos["mejor_rasgo"])
-                                            sheet.update_cell(cell.row, cols_headers.index("peor_rasgo")+1, nuevos["peor_rasgo"])
-                                            sheet.update_cell(cell.row, cols_headers.index("subpuntajes")+1, nuevos["subpuntajes"])
+                                        cols_headers = sheet.row_values(1)
+                                        all_ids = sheet.col_values(1)
+                                        try:
+                                            row_idx = all_ids.index(str(casa["id"])) + 1
+                                            cells = [
+                                                gspread.Cell(row=row_idx, col=cols_headers.index("puntaje_zona")+1, value=nuevos["puntaje_zona"]),
+                                                gspread.Cell(row=row_idx, col=cols_headers.index("mejor_rasgo")+1, value=nuevos["mejor_rasgo"]),
+                                                gspread.Cell(row=row_idx, col=cols_headers.index("peor_rasgo")+1, value=nuevos["peor_rasgo"]),
+                                                gspread.Cell(row=row_idx, col=cols_headers.index("subpuntajes")+1, value=nuevos["subpuntajes"])
+                                            ]
+                                            sheet.update_cells(cells)
                                             import src.gsheets
                                             src.gsheets.get_todas_las_casas.clear()
                                             st.rerun()
+                                        except ValueError:
+                                            pass
                             else:
                                 st.markdown(f"<span style='font-size:0.8em'>⭐ Zona: {puntaje}/10 | 👍 {mejor_rasgo}</span>", unsafe_allow_html=True)
                         
