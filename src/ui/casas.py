@@ -274,7 +274,8 @@ def mostrar_pantalla_casas():
                 lat, lon = c.get("lat"), c.get("lon")
                 if lat and lon:
                     nuevos = calcular_puntaje_zona(lat, lon)
-                    cell = sheet.find(c["id"])
+                    # Convertimos el ID explícitamente a string porque gspread.find tira error si no lo es
+                    cell = sheet.find(str(c["id"]))
                     if cell:
                         sheet.update_cell(cell.row, cols_headers.index("puntaje_zona")+1, nuevos["puntaje_zona"])
                         sheet.update_cell(cell.row, cols_headers.index("mejor_rasgo")+1, nuevos["mejor_rasgo"])
@@ -384,8 +385,8 @@ def mostrar_pantalla_casas():
                                         nuevos = calcular_puntaje_zona(lat, lon)
                                         # Update the specific row
                                         sheet = get_sheet("Casas")
-                                        # Encontrar la fila
-                                        cell = sheet.find(casa["id"])
+                                        # Encontrar la fila (siempre con str)
+                                        cell = sheet.find(str(casa["id"]))
                                         if cell:
                                             # Columnas de zona: puntaje(24), mejor(25), peor(26), sub(27)
                                             cols_headers = sheet.row_values(1)
